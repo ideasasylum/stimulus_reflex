@@ -77,8 +77,16 @@ class StimulusReflex::Channel < ActionCable::Channel::Base
   end
 
   def render_page_and_broadcast_morph(reflex, selectors, data = {})
-    html = render_page(reflex)
-    broadcast_morphs selectors, data, html if html.present?
+
+    morphs = if reflex.component?
+      html = render_component(reflex)
+      morphs = selectors.map { |s| [s, html] }
+    else
+      html = render_page(reflex)
+      collect_morphs selectors, html
+    end
+
+    broadcast_morphs morphs, data
   end
 
   def commit_session(request, response)
@@ -103,16 +111,32 @@ class StimulusReflex::Channel < ActionCable::Channel::Base
     controller.response.body
   end
 
-  def broadcast_morphs(selectors, data, html)
+  def render_component(reflex)
+    controller = reflex.request.controller_class.new
+    controller.instance_variable_set :"@stimulus_reflex", true
+    reflex.instance_variables.each do |name|
+      controller.instance_variable_set name, reflex.instance_variable_get(name)
+    end
+
+    controller.request = reflex.request
+    controller.response = ActionDispatch::Response.new
+    controller.view_context.render reflex.component
+  end
+
+  def collect_morphs selectors, html
     document = Nokogiri::HTML(html)
     selectors = selectors.select { |s| document.css(s).present? }
-    selectors.each do |selector|
+    selectors.map { |s| [s, document.css(s).inner_html] }
+  end
+
+  def broadcast_morphs(morphs, data)
+    morphs.each do |selector, html|
       cable_ready[stream_name].morph(
         selector: selector,
-        html: document.css(selector).inner_html,
+        html: html,
         children_only: true,
         permanent_attribute_name: data["permanent_attribute_name"],
-        stimulus_reflex: data.merge(last: selector == selectors.last)
+        stimulus_reflex: data.merge(last: morphs == morphs.last)
       )
     end
     cable_ready.broadcast
