@@ -3,6 +3,7 @@
 class StimulusReflex::Reflex
   include ActiveSupport::Rescuable
   include ActiveSupport::Callbacks
+  include StimulusReflex::ControllerRenderer
 
   define_callbacks :process, skip_after_callbacks_if_terminated: true
 
@@ -42,7 +43,7 @@ class StimulusReflex::Reflex
     end
   end
 
-  attr_reader :channel, :url, :element, :selectors, :method_name, :component
+  attr_reader :channel, :url, :element, :selectors, :method_name
 
   delegate :connection, to: :channel
   delegate :session, to: :request
@@ -100,10 +101,6 @@ class StimulusReflex::Reflex
   # IMPORTANT: The reflex will not re-render the page if the callback chain is halted
   def halted?
     !!@halted
-  end
-
-  def component?
-    !@component.nil?
   end
 
   def default_reflex
