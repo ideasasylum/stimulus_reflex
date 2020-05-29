@@ -3,6 +3,7 @@
 class StimulusReflex::Reflex
   include ActiveSupport::Rescuable
   include ActiveSupport::Callbacks
+  include StimulusReflex::ControllerRenderer
 
   define_callbacks :process, skip_after_callbacks_if_terminated: true
 

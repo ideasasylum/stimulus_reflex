@@ -41,7 +41,7 @@ class StimulusReflex::Channel < ActionCable::Channel::Base
       broadcast_message subject: "halted", data: data
     else
       begin
-        render_page_and_broadcast_morph reflex, selectors, data
+        broadcast_morphs reflex.morph(selectors), data
       rescue => render_error
         reflex.rescue_with_handler(render_error)
         message = exception_message_with_backtrace(render_error)
@@ -76,43 +76,14 @@ class StimulusReflex::Channel < ActionCable::Channel::Base
     end
   end
 
-  def render_page_and_broadcast_morph(reflex, selectors, data = {})
-    html = render_page(reflex)
-    broadcast_morphs selectors, data, html if html.present?
-  end
-
-  def commit_session(request, response)
-    store = request.session.instance_variable_get("@by")
-    store.commit_session request, response
-  rescue => e
-    message = "Failed to commit session! #{exception_message_with_backtrace(e)}"
-    logger.error "\e[31m#{message}\e[0m"
-  end
-
-  def render_page(reflex)
-    controller = reflex.request.controller_class.new
-    controller.instance_variable_set :"@stimulus_reflex", true
-    reflex.instance_variables.each do |name|
-      controller.instance_variable_set name, reflex.instance_variable_get(name)
-    end
-
-    controller.request = reflex.request
-    controller.response = ActionDispatch::Response.new
-    controller.process reflex.url_params[:action]
-    commit_session reflex.request, controller.response
-    controller.response.body
-  end
-
-  def broadcast_morphs(selectors, data, html)
-    document = Nokogiri::HTML(html)
-    selectors = selectors.select { |s| document.css(s).present? }
-    selectors.each do |selector|
+  def broadcast_morphs(morphs, data)
+    morphs.each do |selector, html|
       cable_ready[stream_name].morph(
         selector: selector,
-        html: document.css(selector).inner_html,
+        html: html,
         children_only: true,
         permanent_attribute_name: data["permanent_attribute_name"],
-        stimulus_reflex: data.merge(last: selector == selectors.last)
+        stimulus_reflex: data.merge(last: morphs == morphs.last)
       )
     end
     cable_ready.broadcast
