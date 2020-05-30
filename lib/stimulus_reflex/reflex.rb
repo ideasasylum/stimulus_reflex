@@ -42,7 +42,7 @@ class StimulusReflex::Reflex
     end
   end
 
-  attr_reader :channel, :url, :element, :selectors, :method_name
+  attr_reader :channel, :url, :element, :selectors, :method_name, :component
 
   delegate :connection, to: :channel
   delegate :session, to: :request
@@ -100,6 +100,10 @@ class StimulusReflex::Reflex
   # IMPORTANT: The reflex will not re-render the page if the callback chain is halted
   def halted?
     !!@halted
+  end
+
+  def component?
+    !@component.nil?
   end
 
   def default_reflex
